@@ -4,8 +4,8 @@
 import os
 
 
-HOST = '127.0.0.1'
-PORT = 8080
+HOST = '127.1.1.1'
+PORT = 8765
 
 # Logging
 LOGGING_LINE_FORMAT = 'LINE:%(lineno)d [%(filename)s] #%(levelname)-2s [%(asctime)s] %(message)s'
