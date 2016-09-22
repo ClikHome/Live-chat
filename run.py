@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     #   Create Tornado application
     application = tornado.web.Application(ChatRouter.urls)
-    application.listen(PORT, no_keep_alive=True)
+    application.listen(PORT, HOST, no_keep_alive=True)
 
     ioloop = tornado.ioloop.IOLoop.instance()
 
