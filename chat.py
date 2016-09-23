@@ -119,7 +119,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 'data_type': 'message',
                 'message': message['body'],
                 'username': self.username,
-                'time': self.local_time
+                'time': self.get_local_time(datetime.utcnow())
             }
 
             for name, connection in self.connections[self.token].items():
