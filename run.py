@@ -26,7 +26,7 @@ if __name__ == "__main__":
     ChatRouter = sockjs.tornado.SockJSRouter(ChatConnection, '/echo')
 
     #   Create Tornado application
-    application = tornado.web.Application(ChatRouter.urls, debug=True)
+    application = tornado.web.Application(ChatRouter.urls)
     application.listen(5000, no_keep_alive=True)
 
     ioloop = tornado.ioloop.IOLoop.instance()
