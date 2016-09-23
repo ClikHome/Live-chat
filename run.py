@@ -27,11 +27,11 @@ if __name__ == "__main__":
 
     #   Create Tornado application
     application = tornado.web.Application(ChatRouter.urls, debug=True)
-    application.listen(PORT, no_keep_alive=True)
+    application.listen(5000, no_keep_alive=True)
 
     ioloop = tornado.ioloop.IOLoop.instance()
 
     #   Print current host and port
-    logging.info('Tornado app listen on http://{port}'.format(port=PORT))
+    # logging.info('Tornado app listen on http://{port}'.format(port=PORT))
 
     ioloop.start()
