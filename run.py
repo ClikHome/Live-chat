@@ -32,6 +32,6 @@ if __name__ == "__main__":
     ioloop = tornado.ioloop.IOLoop.instance()
 
     #   Print current host and port
-    logging.info('Tornado app listen on http://{host}:{port}'.format(host=HOST, port=PORT))
+    logging.info('Tornado app listen on http://{port}'.format(port=PORT))
 
     ioloop.start()
