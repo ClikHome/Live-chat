@@ -42,7 +42,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
         }))
 
     def on_open(self, info):
-        logging.debug(info.cookies)
+        logging.debug("Cookies: " + str(info.cookies))
         # self.cookie = info.get_cookie('sessionid').value
         #
         # if self.cookie in self.cookies:
