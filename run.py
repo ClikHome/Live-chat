@@ -7,6 +7,8 @@ import tornado.ioloop
 import logging
 import sys
 
+from os import environ
+
 from config import *
 from chat import ChatConnection
 
@@ -27,7 +29,7 @@ if __name__ == "__main__":
 
     #   Create Tornado application
     application = tornado.web.Application(ChatRouter.urls)
-    application.listen(5000, no_keep_alive=True)
+    application.listen(environ["PORT"], no_keep_alive=True)
 
     ioloop = tornado.ioloop.IOLoop.instance()
 
