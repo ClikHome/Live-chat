@@ -1,1 +1,1 @@
-web: python run.py -p 8080
+web: python run.py -p 6677
