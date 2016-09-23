@@ -42,22 +42,23 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
         }))
 
     def on_open(self, info):
-        self.cookie = info.get_cookie('sessionid').value
-
-        if self.cookie in self.cookies:
-            self.username = self.cookies[self.cookie]['username']
-            self.token = self.cookies[self.cookie]['token']
-
-            self.authenticated = True
-            self.connections.setdefault(self.token, {})[self.username] = self
-
-            self.send(json.dumps({
-                'data_type': 'auth_success',
-                'username': self.username
-            }))
-
-            logging.debug(
-                "Client authenticated: token '%s', name '%s'" % (self.token, self.username))
+        logging.debug(info.cookies)
+        # self.cookie = info.get_cookie('sessionid').value
+        #
+        # if self.cookie in self.cookies:
+        #     self.username = self.cookies[self.cookie]['username']
+        #     self.token = self.cookies[self.cookie]['token']
+        #
+        #     self.authenticated = True
+        #     self.connections.setdefault(self.token, {})[self.username] = self
+        #
+        #     self.send(json.dumps({
+        #         'data_type': 'auth_success',
+        #         'username': self.username
+        #     }))
+        #
+        #     logging.debug(
+        #         "Client authenticated: token '%s', name '%s'" % (self.token, self.username))
         logging.debug('Connection was opened!')
 
     @tornado.gen.coroutine
