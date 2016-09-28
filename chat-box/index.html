@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Live Chat</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Droid+Sans:400,700">
+
+    </head>
+
+    <body>
+
+        <div id="live-chat">
+            <header class="clearfix" id="header">
+                <a href="#" class="chat-close">x</a>
+                <h4 id="username">Chat</h4>
+            </header>
+
+            <div class="chat">
+                <div id="log" class="chat-history">
+                    <!-- chat-history -->
+                </div>
+
+                <div id="text-input">
+
+                    <fieldset>
+                        <!-- Type your message… -->
+                        <input id="message_input" type="text" placeholder="Enter your name in the chat..." autofocus>
+                        <input type="hidden">
+
+                    </fieldset>
+
+                </div>
+            </div>
+        </div>
+
+        <script src="js/jquery.min.js"></script>
+        <script src="js/index.js"></script>
+        <script src="js/utils.js"></script>
+        <script src="js/sockjs-0.3.4.min.js"></script>
+
+        <script language="javascript" type="text/javascript">
+            var socket_url = 'http://127.0.0.1:5000/echo';
+            var channel = 'qwerty987';
+            var username = null;
+            var messages = document.getElementById('log');
+
+            function message_html(username, body, time) {
+                return '<div class="chat-message clearfix"><span class="chat-time">' + time +
+                    '</span> <h5>' + username + '</h5><p>' + body + '</p></div><hr>'
+            }
+
+            function connect(url) {
+                var sock = new SockJS(url);
+
+                sock.onopen = function(e) {
+                    var now = new Date();
+
+                    sock.send(JSON.stringify({
+                        'data_type': 'get_history',
+                        'channel': window.channel,
+                        'timezone': now.getTime() / 1000
+                    }));
+                };
+
+                sock.onmessage =  function (event) {
+                    data = jQuery.parseJSON(event.data);
+
+                    if (data.data_type == 'auth_error') {
+                        throw data.data.message;
+
+                    } else if (data.data_type == 'auth_success') {
+                        window.username = data.username;
+                        $('#username').html(data.username + " (connected)");
+                        document.getElementById('message_input').setAttribute(
+                                "placeholder", "Type your message…");
+                        console.log('Connected!')
+
+                    } else if (data.data_type == 'message') {
+                        $('#log').append(message_html(data.data.user, data.data.body, data.data.time));
+
+                        if (chat_was_minimized) {
+                            missing_messages += 1;
+                            var header = $('#header');
+
+                            if (header.children('span.chat-message-counter').length > 0) {
+                                $('span.chat-message-counter').text = missing_messages;
+                            } else {
+                                header.append('<span class="chat-message-counter">'
+                                        + missing_messages.toString() +  '</span>');
+                            }
+                        }
+
+                        if (username == data.data.user) {
+                            messages.scrollTop = messages.scrollHeight;
+                        }
+
+                    } else if (data.data_type == 'history') {
+                        data.messages.forEach(function(item, i, arr) {
+                            $('#log').append(message_html(item.user, item.body, item.time));
+                        });
+                        messages.scrollTop = messages.scrollHeight;
+
+                    } else if (data.data_type == 'more_history') {
+                        if (data.messages.length > 0) {
+                            var current_position = messages.scrollHeight - messages.scrollTop;
+                            data.messages.reverse().forEach(function(item, i, arr) {
+                                $('#log').prepend(message_html(item.user, item.body, item.time));
+                            });
+                            messages.scrollTop = messages.scrollHeight - current_position;
+
+                        }
+                    } else if (data.data_type == 'set_cookie') {
+                        setCookie(data.key, data.value, data.path, data.expires);
+                    }
+                };
+
+                sock.onclose = function (e) {
+                    $('#username').html(username + ' (disconnect)');
+                };
+
+                return sock;
+            }
+
+            socket = connect(socket_url, channel);
+
+            $("#message_input").keyup(function(event){
+                if(event.keyCode == 13) {
+                    var message = document.getElementById('message_input');
+
+                    if (window.username == null) {
+                        socket.send(JSON.stringify({
+                            'data_type': 'auth',
+                            'channel': window.channel,
+                            'username': message.value
+                        }));
+
+                    } else {
+                        var dateTime = new Date();
+                        socket.send(JSON.stringify({
+                            'body': message.value,
+                            'data_type': 'message'
+                        }));
+                    }
+
+                    $('#message_input').val('')
+                }
+            });
+
+            messages.scrollTop = messages.scrollHeight;
+
+            $('#log').scroll(function() {
+                if ($('#log').scrollTop() == $(document).height() - $(window).height()) {
+                    socket.send(JSON.stringify({
+                        'data_type': 'load_more_history'
+                    }));
+                }
+            });
+            </script>
+    </body>
+</html>
+    
+
+
+    
+    

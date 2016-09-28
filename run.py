@@ -4,11 +4,11 @@
 import sockjs.tornado
 import tornado.web
 import tornado.ioloop
+import tornadoredis
 import logging
 import sys
 
 from os import environ
-
 from config import *
 from chat import ChatConnection
 
@@ -18,7 +18,6 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
 
     logging.basicConfig(
-        stream=sys.stdout,
         level=logging.DEBUG,
         format=LOGGING_LINE_FORMAT,
         datefmt=LOGGING_DATETIME_FORMAT
@@ -28,12 +27,15 @@ if __name__ == "__main__":
     ChatRouter = sockjs.tornado.SockJSRouter(ChatConnection, '/echo')
 
     #   Create Tornado application
-    application = tornado.web.Application(ChatRouter.urls)
+    settings = {'debug': True}
+    application = tornado.web.Application(ChatRouter.urls, **settings)
     application.listen(int(os.environ.get('PORT', '5000')), no_keep_alive=True)
+
+    # tornado.ioloop.PeriodicCallback(ChatConnection.dump_stats, 1000).start()
 
     ioloop = tornado.ioloop.IOLoop.instance()
 
     #   Print current host and port
-    # logging.info('Tornado app listen on http://{port}'.format(port=PORT))
+    logging.info('Tornado app listen port on {port}'.format(port=PORT))
 
     ioloop.start()

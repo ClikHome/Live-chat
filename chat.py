@@ -9,23 +9,33 @@ import sys
 import json
 import sockjs.tornado
 import logging
+import tornadoredis
+import uuid
 
 from datetime import datetime, timedelta
-from tornado.httpserver import HTTPServer
+from tornado.ioloop import IOLoop
+from sockjs.tornado.sessioncontainer import SessionContainer
 
 from config import *
 
 
 class ChatConnection(sockjs.tornado.SockJSConnection):
     connections = {}
-    messages_history = {}
     cookies = {}
+    sessions = {}
 
+
+    # Settings of user
     authenticated = False
-    token = None
+    channel = None
     username = None
-    cookie = None
+    session_id = None
     timedelta = None
+    uploaded_messages_count = 0
+
+    # Redis client
+    rclient = tornadoredis.Client()
+    rclient.connect()
 
     def send_error(self, message, error_type=None):
         return self.send(json.dumps({
@@ -35,38 +45,80 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             }
         }))
 
-    def send_message(self, message, data_type):
+    def send_message_to_channel(self, message):
+        message = json.dumps({
+            'data_type': 'message',
+            'data': {
+                'body': message,
+                'user': self.username,
+                'time': datetime.utcnow().strftime('%d.%m.%Y %H:%M:%S')
+            }
+        })
+
+        self.broadcast(self.connections.get(self.channel, []), message)
+
+    def send_message(self, user, body, created_at):
         return self.send(json.dumps({
-            'data_type': data_type,
-            'data': message,
+            'data_type': 'message',
+            'data': {
+                'body': body,
+                'user': user,
+                'time': created_at
+            }
         }))
 
+    @tornado.gen.engine
+    def send_history(self, start, finish, data_type='history'):
+        history_to_channel = []
+
+        with self.rclient.pipeline() as pipe:
+            pipe.lrange('channel:{}:messages'.format(self.channel), -finish, -start)
+            result = yield tornado.gen.Task(pipe.execute)
+
+            if isinstance(result, list) and result:
+                for history_message in map(json.loads, result[0]):
+                    history_message['time'] = self.get_local_time(history_message['datetime'])
+                    history_to_channel.append(history_message)
+
+        self.send(json.dumps({'data_type': data_type, 'messages': history_to_channel}))
+        self.uploaded_messages_count += len(history_to_channel)
+
+    def set_cookie(self, key, value, path='/', expires=60*60*24*30):
+        self.send(json.dumps({
+            'data_type': 'set_cookie',
+            'key': key,
+            'value': value,
+            'path': path,
+            'expires': expires
+        }))
+
+    @tornado.gen.engine
     def on_open(self, info):
-        logging.debug("Cookies: " + str(info.cookies))
-        # self.cookie = info.get_cookie('sessionid').value
-        #
-        # if self.cookie in self.cookies:
-        #     self.username = self.cookies[self.cookie]['username']
-        #     self.token = self.cookies[self.cookie]['token']
-        #
-        #     self.authenticated = True
-        #     self.connections.setdefault(self.token, {})[self.username] = self
-        #
-        #     self.send(json.dumps({
-        #         'data_type': 'auth_success',
-        #         'username': self.username
-        #     }))
-        #
-        #     logging.debug(
-        #         "Client authenticated: token '%s', name '%s'" % (self.token, self.username))
+
+        logging.info('New client at %s' % str(info.__dict__))
+
+        self.session_id = info.get_cookie('sessionid')
+        self.session_id = self.session_id.value if self.session_id else None
+
+        # result = yield tornado.gen.Task(self.rclient.exists, 'channel:{}:users'.format(self.channel), self.uid)
+        # logging.debug('Result of saving user to Redis: ' + str(result))
+
+        if self.session_id and self.session_id in self.sessions:
+            user_data = self.sessions[self.session_id]
+            self.sign_in_like(user_data['username'], user_data['channel'])
+
+
+
+
+
+
         logging.debug('Connection was opened!')
 
-    @tornado.gen.coroutine
+    # @tornado.web.asynchronous
+    @tornado.gen.engine
     def on_message(self, msg):
         logging.debug('-' * 20)
         logging.debug('Got message: ' + str(msg))
-        logging.debug('Active user: {"token": "%s", "username": "%s", "authorized": "%s"}' % (
-            self.token, self.username, self.authenticated))
 
         try:
             message = json.loads(msg)
@@ -75,60 +127,61 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             logging.debug("Invalid JSON")
             return
 
+        # Authorization
         if message['data_type'] == 'auth' and not self.authenticated:
-            self.token = message.get('token', None)
+            self.channel = message.get('channel', None)
             self.username = message.get('username', None)
 
-            if self.token and self.username:
-                if self.username in self.connections.get(self.token, {}):
-                    self.send({'data_type': 'username_already_taken'})
-                    return
+            if self.channel and self.username:
+                for user in self.connections.get(self.channel, []):
+                    if user.username == self.username and id(user) != id(self):
+                        return
 
-                self.authenticated = True
-                self.connections.setdefault(self.token, {})[self.username] = self
+                    # Save session to Redis
+                    # with self.rclient.pipeline() as pipe:
+                    #     pipe.sadd('channel:{}:users'.format(self.channel), self.session_id)
+                    #     user_directory = 'channel:{}:user:{}'.format(self.channel, self.session_id)
+                    #     pipe.hset(user_directory, 'username', self.username)
+                    #     pipe.hset(user_directory, 'channel', self.channel)
+                    #
+                    #     result = yield tornado.gen.Task(pipe.execute)
+                    #     logging.debug('Result of saving user to Redis: ' + str(result))
 
-                self.cookies[self.cookie] = {
-                    'username': self.username,
-                    'token': self.token
-                }
+                    self.sign_in_like(self.username, self.channel)
 
-                self.send(json.dumps({
-                    'data_type': 'auth_success',
-                    'username': self.username
-                }))
-
-                logging.debug(
-                    "Client authenticated: token '%s', name '%s'" % (self.token, self.username))
-
-        elif message['data_type'] == 'get_history' and message.get('token') and message.get('timezone'):
-            self.token = message['token']
+        # History
+        elif message['data_type'] == 'get_history' and message.get('channel') and message.get('timezone'):
+            self.channel = message['channel']
             self.timedelta = datetime.fromtimestamp(
                 message['timezone']) - datetime.utcfromtimestamp(message['timezone'])
 
-            history_to_token = []
-            chat_history = self.messages_history.get(self.token, [])
+            self.send_history(1, HISTORY_MESSAGES_TO_LOAD)
+            self.connections.setdefault(self.channel, set()).add(self)
 
-            for single_message in chat_history:
-                single_message['time'] = self.get_local_time(single_message['datetime'])
-                history_to_token.append({key: value for key, value in single_message.items() if key != 'datetime'})
+        elif message['data_type'] == 'load_more_history':
+            self.send_history(
 
-            self.send(json.dumps({'data_type': 'history', 'messages': history_to_token}))
+                self.uploaded_messages_count,
+                self.uploaded_messages_count + HISTORY_MESSAGES_TO_LOAD,
+                data_type='more_history'
+            )
 
-        elif message['data_type'] == 'message' and self.authenticated and self.token and self.username:
-            data = {
-                'data_type': 'message',
-                'message': message['body'],
-                'username': self.username,
-                'time': self.get_local_time(datetime.utcnow())
+
+        # Messages
+        elif message['data_type'] == 'message' and self.is_valid:
+            self.send_message_to_channel(message['body'])
+
+            _message = {
+                'channel': self.channel,
+                'user': self.username,
+                'body': message['body'],
+                'datetime': datetime.utcnow().strftime('%d.%m.%Y %H:%M:%S')
             }
 
-            for name, connection in self.connections[self.token].items():
-                connection.send(json.dumps(data))
+            result = yield tornado.gen.Task(
+                self.rclient.rpush, 'channel:{}:messages'.format(self.channel), json.dumps(_message))
 
-            data['datetime'] = datetime.utcnow()
-            del data['data_type']
-            self.messages_history.setdefault(self.token, []).append(data)
-
+            self.uploaded_messages_count += 1
             logging.debug('Message was sent!')
 
         else:
@@ -136,11 +189,25 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             logging.debug("Invalid data type %s" % message['data_type'])
 
     def on_close(self):
-        if self.connections.get(self.token) and self.connections[self.token].get(self.username):
-            del self.connections[self.token][self.username]
-        logging.debug("Client was removed: token '%s', name '%s'" % (self.token, self.username))
+        if self.authenticated:
+            self.connections[self.channel].remove(self)
+        logging.debug("Client was removed: channel '%s', name '%s'" % (self.channel, self.username))
 
         return super(ChatConnection, self).on_close()
+
+    def sign_in_like(self, username, channel):
+        self.username = username
+        self.channel = channel
+        self.authenticated = True
+        self.connections.setdefault(channel, set()).add(self)
+
+        self.send(json.dumps({
+            'data_type': 'auth_success',
+            'username': username
+        }))
+
+        logging.debug(
+            "Client authenticated: channel '%s', name '%s'" % (channel, username))
 
     @property
     def local_time(self):
@@ -150,12 +217,19 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
     def get_local_time(self, utc_datetime):
         if utc_datetime:
+            if isinstance(utc_datetime, (unicode, str)):
+                utc_datetime = datetime.strptime(utc_datetime, '%d.%m.%Y %H:%M:%S')
             return (utc_datetime + self.timedelta).time().strftime('%H:%M')
         return None
 
     @property
     def is_valid(self):
-        return all([self.authenticated, self.token, self.timedelta, self.username])
+        return all([self.authenticated, self.channel, self.timedelta, self.username])
+
+    @classmethod
+    def dump_stats(cls):
+        connections = sum([len(cls.connections[channel]) for channel in cls.connections])
+        logging.info('Clients: ' + str(connections))
 
 
 

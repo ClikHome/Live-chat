@@ -1,6 +1,8 @@
 # Own
-chat-box/
-
+test.py
+*.sh
+chat-box/images/
+.*/
 
 # IntelliJ project files
 .idea
