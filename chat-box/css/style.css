@@ -86,6 +86,25 @@ p { margin: 0; }
 	width: 8px;
 }
 
+#live-chat i {
+	border-radius: 50%;
+	content: "";
+	display: inline-block;
+	height: 8px;
+	margin: 0 8px 0 0;
+	width: 8px;
+}
+
+#live-chat i#connected {
+	background: #1a8a34;
+	
+}
+
+#live-chat i#disconnect {
+	background: #1a8a34;
+	
+}
+
 #live-chat h4 {
 	font-size: 12px;
 }
@@ -101,9 +120,11 @@ p { margin: 0; }
 #live-chat input[type="text"] {
 	border: 1px solid #ccc;
 	border-radius: 3px;
-	padding: 8px;
+	/*padding: 8px;*/
+	padding: 5px;
 	outline: none;
-	width: 234px;
+	/*width: 234px;*/
+	width: 210px;
 }
 
 .chat-message-counter {
@@ -142,7 +163,7 @@ p { margin: 0; }
 }
 
 .chat-history {
-	height: 252px;
+	height: 300px;
 	padding: 8px 24px;
 	overflow-y: scroll;
 }
@@ -183,4 +204,23 @@ p { margin: 0; }
 #updown.up::before {
     content: '▲';
 }
+
+img.icon-image {
+	height: 15px;
+	width: 15px;
+}
+
+/*#live-chat a span.title {*/
+    /*float: right;*/
+    /*display: block;*/
+    /*margin-right: 10px;*/
+    /*margin-top: 5px;*/
+/*}*/
+
+/*#live-chat a span#login {*/
+    /*position: static;*/
+    /*height: 20px;*/
+    /*margin-top: 0px;*/
+    /*margin-top: 3px;*/
+/*}*/
 

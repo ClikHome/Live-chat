@@ -4,6 +4,7 @@
 import sockjs.tornado
 import tornado.web
 import tornado.ioloop
+import tornado.autoreload
 import tornadoredis
 import logging
 import sys
@@ -27,15 +28,24 @@ if __name__ == "__main__":
     ChatRouter = sockjs.tornado.SockJSRouter(ChatConnection, '/echo')
 
     #   Create Tornado application
-    settings = {'debug': True}
-    application = tornado.web.Application(ChatRouter.urls, **settings)
-    application.listen(int(os.environ.get('PORT', '5000')), no_keep_alive=True)
+    settings = {'debug': True,}
+    application = tornado.web.Application(
+        ChatRouter.urls,
+        # debug=True,
+        # autoreload=True
+    )
 
-    # tornado.ioloop.PeriodicCallback(ChatConnection.dump_stats, 1000).start()
+    port = int(os.environ.get('PORT', '5000'))
+    application.listen(port, no_keep_alive=True)
 
-    ioloop = tornado.ioloop.IOLoop.instance()
+    logging.info("[*] Listening at 0.0.0.0:%i" % (port,))
+
+    io_loop = tornado.ioloop.IOLoop.instance()
 
     #   Print current host and port
     logging.info('Tornado app listen port on {port}'.format(port=PORT))
 
-    ioloop.start()
+    try:
+        io_loop.start()
+    except KeyboardInterrupt:
+        print 'Interrupt'

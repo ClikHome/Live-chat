@@ -19,8 +19,8 @@ var missing_messages = 0;
 		console.log('Chat is minimized: ' + chat_was_minimized.toString());
 
 		// scroll to the bottom
-		var messages = document.getElementById('log');
-		messages.scrollTop = messages.scrollHeight;
+		// var messages = document.getElementById('log');
+		// messages.scrollTop = messages.scrollHeight;
 	});
 
 	$('.chat-close').on('click', function(e) {

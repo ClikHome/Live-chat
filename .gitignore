@@ -3,6 +3,7 @@ test.py
 *.sh
 chat-box/images/
 .*/
+test*.py
 
 # IntelliJ project files
 .idea

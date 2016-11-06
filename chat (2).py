@@ -141,23 +141,19 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             logging.debug("Invalid JSON")
             return
 
-        logging.debug('Data Type: ' + str(message.get('data_type')))
-
         # Authorization
         if message['data_type'] == 'auth' and not self.authenticated:
             self.channel = message.get('channel', None)
             self.username = message.get('username', '').strip().title()
-
-            print self.channel, self.username
 
             if self.channel and self.username:
                 # Checking channel in Redis
                 result = yield tornado.gen.Task(
                     self.rclient.hget, 'channels', self.channel)
 
-                # if not result or (not result.isdigit() and not isinstance(result, int)):
-                #     self.send_error('Channel not valid', error_type='auth')
-                #     return
+                if not result or (not result.isdigit() and not isinstance(result, int)):
+                    self.send_error('Channel not valid', error_type='auth')
+                    return
 
                 self.channel_id = int(result)
 
