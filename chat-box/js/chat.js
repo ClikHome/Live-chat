@@ -16,10 +16,12 @@ $("#message_input").keyup(function(event){
         var message = document.getElementById('message_input');
 
         if (window.username == null) {
+            window.username = message.value;
+
             socket.send(JSON.stringify({
                 'data_type': 'auth',
                 'channel': window.channel,
-                'username': message.value
+                'username': window.username
             }));
 
         } else {
@@ -65,14 +67,13 @@ function connect(url, channel) {
             throw data.data.message;
 
         } else if (data.data_type == 'auth_success') {
-            window.username = data.username;
             $('#username').html(data.username + " (connected)");
             document.getElementById('message_input').setAttribute(
                     "placeholder", "Type your message…");
             console.log('Connected!')
 
         } else if (data.data_type == 'message') {
-            $('#log').append(message_html(data.data.user, data.data.body, data.data.datetime));
+            $('#log').append(message_html(data.data.username, data.data.body, data.data.created_at));
 
             if (chat_was_minimized) {
                 missing_messages += 1;
@@ -86,7 +87,7 @@ function connect(url, channel) {
                 }
             }
 
-            if (username == data.data.user) {
+            if (username == data.data.username) {
                 messages.scrollTop = messages.scrollHeight;
             }
 

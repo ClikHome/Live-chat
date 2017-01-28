@@ -132,7 +132,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
     def on_message(self, msg):
         logging.debug('-' * 20)
 
-        # logging.debug(u'Got message: ' + str(unicode(msg).encode('utf-8')))
+        logging.debug(u'Got message: ' + str(unicode(msg).encode('utf-8')))
 
         try:
             message = json.loads(msg)
@@ -148,16 +148,19 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
             self.channel = message.get('channel', None)
             self.username = message.get('username', '').strip().title()
 
-            print self.channel, self.username
+            logging.debug('Username: "' + self.username + '"')
+            logging.debug('Channel: "' + self.channel + '"')
+            logging.debug('Message: "' + str(message) + '"')
 
             if self.channel and self.username:
-                # Checking channel in Redis
+                #  Checking channel in Redis
                 result = yield tornado.gen.Task(
                     self.rclient.hget, 'channels', self.channel)
 
-                # if not result or (not result.isdigit() and not isinstance(result, int)):
-                #     self.send_error('Channel not valid', error_type='auth')
-                #     return
+                #  Validation channel in the Redis
+                if not result or (not result.isdigit() and not isinstance(result, int)):
+                    self.send_error('Channel not valid', error_type='auth')
+                    return
 
                 self.channel_id = int(result)
 
@@ -169,7 +172,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 # if self.username in channel_used_usernames:
                 #     self.send_error('Username is used', error_type='auth')
 
-                # User login if user already exist else create user
+                #  User login if user already exist else create user
                 if not self.authenticated:
                     # Register new user
                     yield self.users_store.set_user(self)
@@ -177,7 +180,6 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
 
                     # Send data to Django
                     # if self.is_valid:
-
 
                 self.login_as({
                     'username': self.username,
@@ -201,7 +203,7 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 self.uploaded_messages_count + HISTORY_MESSAGES_TO_LOAD,
                 data_type='more_history')
 
-        # Messages
+        # Main messages
         elif message['data_type'] == 'message' and self.is_valid:
             received_message = {
                 'data_type': 'message',
@@ -213,10 +215,10 @@ class ChatConnection(sockjs.tornado.SockJSConnection):
                 }
             }
 
-            # Send message to all users of chat
+            #  Send message to all users of chat
             self.send_message_to_channel(received_message['data'])
 
-            # Send message to Django
+            #  Send message to Django
             self.publish_stream.send_json(received_message)
 
             # result = yield tornado.gen.Task(
